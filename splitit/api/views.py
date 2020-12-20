@@ -16,8 +16,8 @@ from django.utils import timezone
 
 from datetime import datetime
 
-from splitit.api.models import *
-from splitit.api.utils import *
+from api.models import *
+from api.utils import *
 
 import sys
 import logging

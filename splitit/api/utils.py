@@ -1,4 +1,4 @@
-from splitit.api.models import *
+from api.models import *
 import heapq
 from collections import defaultdict
 
