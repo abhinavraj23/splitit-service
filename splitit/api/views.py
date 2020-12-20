@@ -42,7 +42,7 @@ class SignUpAPI(APIView):
                 data = json.loads(data)
 
             first_name = data["first_name"]
-            last_name = data["last_name"]
+            last_name = data.get("last_name", '')
             email = data["email"]
             password = data["password"]
             amount_owed = 0
@@ -75,6 +75,27 @@ class CreateGroupAPI(APIView):
             logger.info("CreateGroupAPI: %s", str(data))
             if not isinstance(data, dict):
                 data = json.loads(data)
+
+            name = data.get("name")
+            description = data.get("description", "")
+            to_simplify = data.get("to_simplify", False)
+
+            created_by_obj = SplititUser.objects.get(
+                username=request.user.username)
+
+            if name is None:
+                resp_status = status.HTTP_400_BAD_REQUEST
+            else:
+                if SplititGroup.objects.filter(created_by=created_by_obj, name=name).exists() == False:
+                    splitit_group_obj = SplititGroup.objects.create(
+                        name=name, description=description, to_simplify=to_simplify, created_by=created_by_obj)
+
+                    splitit_group_obj.members.add(created_by_obj)
+                    splitit_group_obj.save()
+
+                else:
+                    response["message"] = "USER CANNOT HAVE TWO GROUPS OF SAME NAME"
+                    esp_status = status.HTTP_409_CONFLICT
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -113,7 +134,7 @@ class AddMemberToGroupAPI(APIView):
                         resp_status = status.HTTP_401_UNAUTHORIZED
                     else:
                         user_already_member = SplititGroup.objects.filter(
-                            members__username=request.user.username)
+                            members__username=request.user.username).exists()
 
                         if user_already_member:
                             resp_status = status.HTTP_409_CONFLICT

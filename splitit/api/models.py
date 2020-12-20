@@ -32,7 +32,7 @@ class SplititGroup(models.Model):
     description = models.CharField(max_length=300, blank=True, null=True)
     created_by = models.ForeignKey(
         SplititUser, related_name="created_by", null=True, blank=True, on_delete=models.SET_NULL)
-    members = models.ManyToManyField(SplititUser)
+    members = models.ManyToManyField(SplititUser, blank=True)
     to_simplify = models.BooleanField(blank=True, default=False)
     created_date = models.DateTimeField()
     modified_date = models.DateTimeField()
