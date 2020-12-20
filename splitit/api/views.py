@@ -131,7 +131,7 @@ class AddMemberToGroupAPI(APIView):
             group_id = data.get('group_id')
             username = data.get('username')
 
-            if group_id is None or username is None:
+            if isNull(group_id) or isNull(username):
                 resp_status = status.HTTP_400_BAD_REQUEST
             else:
                 group_exists = SplititGroup.objects.filter(
@@ -229,7 +229,7 @@ class CreateBillAPI(APIView):
             total_amount = data.get('total_amount')
 
             if isNull(group_id) or isNull(splitting_type) or isNull(member_transactions) or isNull(total_amount) or isNull(name):
-                resp_status = status.HTTP_401_UNAUTHORIZED
+                resp_status = status.HTTP_400_BAD_REQUEST
 
             else:
                 payer_obj = SplititUser.objects.get(
@@ -248,24 +248,24 @@ class CreateBillAPI(APIView):
                     response['bill_id'] = str(bill_obj.id)
 
                     '''
-                    Below is an important logic of the program, for each debter, this logic will
+                    Below is an important logic of the program, for each debtor, this logic will
 
-                    1) Add the amount_owed to the debter
+                    1) Add the amount_owed to the debtor
                     2) Add the transaction to the transaction table
                     3) Add the transaction to group transaction table
                     '''
 
                     for member_transaction in member_transactions:
-                        debter_id = member_transactions['user_id']
-                        debter_obj = SplititUser.objects.get(id=debter_id)
+                        debtor_id = member_transactions['user_id']
+                        debtor_obj = SplititUser.objects.get(id=debtor_id)
                         amount = float(member_transactions['amount'])
 
-                        debter_obj.amount_owed += amount
-                        debter_obj.save()
+                        debtor_obj.amount_owed += amount
+                        debtor_obj.save()
 
-                        addToGroupTransactions(amount, debter_obj, bill_obj)
+                        addToGroupTransactions(amount, debtor_obj, bill_obj)
                         Transaction.objects.create(
-                            bill=bill_obj, amount=amount, debter=debter_obj)
+                            bill=bill_obj, amount=amount, debtor=debtor_obj)
 
                     resp_status = status.HTTP_200_OK
                 else:
@@ -338,6 +338,34 @@ class GetGroupDebtAPI(APIView):
             if not isinstance(data, dict):
                 data = json.loads(data)
 
+            group_id = data.get('group_id')
+
+            if isNull(group_id):
+                resp_status = status.HTTP_400_BAD_REQUEST
+
+            else:
+                group_obj = SplititGroup.objects.get(id=group_id)
+                user_obj = SplititUser.objects.get(
+                    username=request.user.username)
+                group_transaction_objs = GroupTransaction.objects.filter(
+                    group=group_obj, debtor=user_obj)
+
+                amount_owed = 0
+                for group_transaction_obj in group_transaction_objs:
+                    amount_owed += group_transaction_obj.amount
+
+                group_transaction_objs = GroupTransaction.objects.filter(
+                    group=group_obj, payer=user_obj)
+
+                amount_paid = 0
+                for group_transaction_obj in group_transaction_objs:
+                    amount_paid += group_transaction_obj.amount
+
+                response['group_amount_owed'] = amount_owed
+                response['group_amount_paid'] = amount_paid
+                resp_status = status.HTTP_200_OK
+
+
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             logger.error("GetGroupDebtAPI: %s at %s",
@@ -357,6 +385,21 @@ class SettleTransactionAPI(APIView):
             logger.info("SettleTransactionAPI: %s", str(data))
             if not isinstance(data, dict):
                 data = json.loads(data)
+
+            group_id = data.get('group_id')
+
+            if isNull(group_id):
+                resp_status = status.HTTP_400_BAD_REQUEST
+            else:
+                group_obj = SplititGroup.objects.get(id=group_id)
+                group_transaction_objs = GroupTransaction.objects.filter(group=group_obj)
+
+                if group_obj.to_simplify:
+                    minimumSpaningTree(group_transaction_objs)
+
+                else:
+                    resp_status = status.HTTP_200_OK
+
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()

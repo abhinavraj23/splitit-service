@@ -62,8 +62,8 @@ class Bill(models.Model):
 
     id = models.CharField(max_length=200, primary_key=True)
     name = models.CharField(max_length=100, blank=False)
-    payer = models.ForeignKey(SplititUser, on_delete=models.CASCADE)
-    group = models.ForeignKey(SplititGroup, on_delete=models.CASCADE)
+    payer = models.ForeignKey(SplititUser, on_delete=models.CASCADE, db_index=True)
+    group = models.ForeignKey(SplititGroup, on_delete=models.CASCADE, db_index=True)
 
     SPLITTING_TYPE = (
         ("P", "PERCENTAGE"),
@@ -100,8 +100,8 @@ class Bill(models.Model):
 class Transaction(models.Model):
 
     id = models.CharField(max_length=200, primary_key=True)
-    bill = models.ForeignKey(Bill, on_delete=models.CASCADE)
-    debter = models.ForeignKey(SplititUser, on_delete=models.CASCADE)
+    bill = models.ForeignKey(Bill, on_delete=models.CASCADE, db_index=True)
+    debtor = models.ForeignKey(SplititUser, on_delete=models.CASCADE)
     amount = models.DecimalField(
         max_digits=7, decimal_places=1, default=0, blank=True)
 
@@ -126,11 +126,11 @@ class Transaction(models.Model):
 class GroupTransaction(models.Model):
 
     id = models.CharField(max_length=200, primary_key=True)
-    group = models.ForeignKey(SplititGroup, on_delete=models.CASCADE)
+    group = models.ForeignKey(SplititGroup, on_delete=models.CASCADE, db_index=True)
     payer = models.ForeignKey(
-        SplititUser, related_name='transaction_payer', on_delete=models.CASCADE)
-    debter = models.ForeignKey(
-        SplititUser, related_name='transaction_debter', on_delete=models.CASCADE)
+        SplititUser, related_name='transaction_payer', on_delete=models.CASCADE, db_index=True)
+    debtor = models.ForeignKey(
+        SplititUser, related_name='transaction_debtor', on_delete=models.CASCADE, db_index=True)
     amount = models.DecimalField(
         max_digits=7, decimal_places=1, default=0, blank=True)
 
