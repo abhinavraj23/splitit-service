@@ -52,9 +52,9 @@ class SignUpAPI(APIView):
                 splitit_user_obj.set_password(password)
                 splitit_user_obj.save()
                 response["username"] = splitit_user_obj.username
-                response["status"] = 200
+                resp_status = status.HTTP_200_OK
             else:
-                response["status"] = 409
+                resp_status = status.HTTP_409_CONFLICT
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
