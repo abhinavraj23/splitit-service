@@ -146,7 +146,7 @@ LOGGING = {
         },
         'applog': {
             'level':'INFO',
-            'class':'logging.handlers.Rot`at`ingFileHandler',
+            'class':'logging.handlers.RotatingFileHandler',
             'filename': APP_LOG_FILENAME,
             'maxBytes': LOGFILE_SIZE,
             'backupCount': LOGFILE_COUNT,

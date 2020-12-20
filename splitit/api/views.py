@@ -79,6 +79,7 @@ class CreateGroupAPI(APIView):
             name = data.get("name")
             description = data.get("description", "")
             to_simplify = data.get("to_simplify", False)
+            to_simplify = bool(to_simplify)
 
             created_by_obj = SplititUser.objects.get(
                 username=request.user.username)
@@ -187,6 +188,30 @@ class CreateBillAPI(APIView):
             if not isinstance(data, dict):
                 data = json.loads(data)
 
+            created_by_obj = SplititUser.objects.get(
+                username=request.user.username)
+
+            group_id = data.get('group_id')
+
+            '''
+            The members payment data according to splitting method is expected
+            to be calculated in the frontend and is expected in the following format:
+
+            [
+                {
+                    user_id: "a1",
+                    amount: "90"
+                },
+                {
+                    user_id: "a2",
+                    amount: "100"
+                },
+                ...
+            ]
+
+            '''
+
+
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             logger.error("CreateBillAPI: %s at %s",
@@ -255,7 +280,7 @@ class GetGroupDebtAPI(APIView):
         return Response(data=response, status=resp_status)
 
 
-class SettleBalanceAPI(APIView):
+class SettleTransactionAPI(APIView):
     permission_classes = (IsAuthenticated, )
 
     def post(self, request, *args, **kwargs):
@@ -263,13 +288,13 @@ class SettleBalanceAPI(APIView):
         resp_status = status.HTTP_500_INTERNAL_SERVER_ERROR
         try:
             data = request.data
-            logger.info("SettleBalanceAPI: %s", str(data))
+            logger.info("SettleTransactionAPI: %s", str(data))
             if not isinstance(data, dict):
                 data = json.loads(data)
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
-            logger.error("SettleBalanceAPI: %s at %s",
+            logger.error("SettleTransactionAPI: %s at %s",
                          e, str(exc_tb.tb_lineno))
 
         return Response(data=response, status=resp_status)
@@ -291,4 +316,4 @@ GetTotalDebt = GetTotalDebtAPI.as_view()
 
 GetGroupDebt = GetGroupDebtAPI.as_view()
 
-SettleBalance = SettleBalanceAPI.as_view()
+SettleTransaction = SettleTransactionAPI.as_view()

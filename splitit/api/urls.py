@@ -26,5 +26,5 @@ urlpatterns = [
     url(r'^get-total-debt/$', views.GetTotalDebt),
     url(r'^get-group-debt/$', views.GetGroupDebt),
 
-    url(r'^settle-bill/$', views.SettleBill)
+    url(r'^settle-transaction/$', views.SettleTransaction)
 ]
