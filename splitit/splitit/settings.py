@@ -119,6 +119,55 @@ USE_L10N = True
 
 USE_TZ = True
 
+# Log Conf
+if not os.path.exists('log'):
+    os.makedirs('log')
+
+APP_LOG_FILENAME = os.path.join(BASE_DIR, 'log/app.log')
+
+LOGFILE_SIZE = 20 * 1024 * 1024
+LOGFILE_COUNT = 5
+LOGFILE_APP = 'splitit'
+LOGFILE_APP2 = 'api'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format' : "[%(asctime)s] %(levelname)s [%(filename)s:%(lineno)s] %(message)s",
+            'datefmt' : "%d-%b-%Y %H:%M:%S"
+        }
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler'
+        },
+        'applog': {
+            'level':'INFO',
+            'class':'logging.handlers.Rot`at`ingFileHandler',
+            'filename': APP_LOG_FILENAME,
+            'maxBytes': LOGFILE_SIZE,
+            'backupCount': LOGFILE_COUNT,
+            'formatter': 'standard',
+        }
+    },
+    'loggers': {
+        LOGFILE_APP: {
+            'handlers': ['applog'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        LOGFILE_APP2: {
+            'handlers': ['applog'],
+            'level': 'INFO',
+            'propagate': True,
+        }
+    }
+}
+
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/

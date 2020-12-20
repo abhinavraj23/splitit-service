@@ -33,6 +33,7 @@ class SplititGroup(models.Model):
     created_by = models.ForeignKey(
         SplititUser, related_name="created_by", null=True, blank=True, on_delete=models.SET_NULL)
     members = models.ManyToManyField(SplititUser)
+    to_simplify = models.BooleanField(blank=True, default=False)
     created_date = models.DateTimeField()
     modified_date = models.DateTimeField()
 
@@ -95,6 +96,12 @@ class Transaction(models.Model):
     class Meta:
         verbose_name = "Bill"
         verbose_name_plural = "Bill"
+
+    def get_payer(self):
+        return str(self.bill.payer.username)
+
+    def get_group(self):
+        return str(self.bill.group.id)
 
     def save(self, *args, **kwargs):
 
