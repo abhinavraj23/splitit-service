@@ -59,7 +59,6 @@ class Bill(models.Model):
 
     id = models.CharField(max_length=200, primary_key=True)
     name = models.CharField(max_length=100, blank=False)
-    description = models.CharField(max_length=300, blank=True, null=True)
     payer = models.ForeignKey(SplititUser, on_delete=models.CASCADE)
     group = models.ForeignKey(SplititGroup, on_delete=models.CASCADE)
 
@@ -69,11 +68,11 @@ class Bill(models.Model):
         ("E", "EQUALLY"),
     )
 
-    voucher_type = models.CharField(
+    splitting_type = models.CharField(
         max_length=50, choices=SPLITTING_TYPE, default="E")
     total_amount = models.DecimalField(
         max_digits=7, decimal_places=1, default=0, blank=True)
-    name = models.CharField(max_length=100, blank=True, default="INR")
+    currency = models.CharField(max_length=100, blank=True, default="INR")
     created_date = models.DateTimeField()
     modified_date = models.DateTimeField()
 

@@ -16,7 +16,8 @@ from django.utils import timezone
 
 from datetime import datetime
 
-from api.models import *
+from splitit.api.models import *
+from splitit.api.utils import *
 
 import sys
 import logging
@@ -41,21 +42,24 @@ class SignUpAPI(APIView):
             if not isinstance(data, dict):
                 data = json.loads(data)
 
-            first_name = data["first_name"]
+            first_name = data.get("first_name")
             last_name = data.get("last_name", '')
-            email = data["email"]
-            password = data["password"]
+            email = data.get("email")
+            password = data.get("password")
             amount_owed = 0
 
-            if SplititUser.objects.filter(username=email).exists() == False:
-                splitit_user_obj = SplititUser.objects.create(
-                    username=email, first_name=first_name, last_name=last_name, email=email, amount_owed=amount_owed)
-                splitit_user_obj.set_password(password)
-                splitit_user_obj.save()
-                response["username"] = splitit_user_obj.username
-                resp_status = status.HTTP_200_OK
+            if isNull(first_name) or isNull(email) or isNull(password):
+                resp_status = status.HTTP_400_BAD_REQUEST
             else:
-                resp_status = status.HTTP_409_CONFLICT
+                if SplititUser.objects.filter(username=email).exists() == False:
+                    splitit_user_obj = SplititUser.objects.create(
+                        username=email, first_name=first_name, last_name=last_name, email=email, amount_owed=amount_owed)
+                    splitit_user_obj.set_password(password)
+                    splitit_user_obj.save()
+                    response["username"] = splitit_user_obj.username
+                    resp_status = status.HTTP_200_OK
+                else:
+                    resp_status = status.HTTP_409_CONFLICT
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -87,16 +91,22 @@ class CreateGroupAPI(APIView):
             if name is None:
                 resp_status = status.HTTP_400_BAD_REQUEST
             else:
-                if SplititGroup.objects.filter(created_by=created_by_obj, name=name).exists() == False:
-                    splitit_group_obj = SplititGroup.objects.create(
-                        name=name, description=description, to_simplify=to_simplify, created_by=created_by_obj)
+                splitit_group_obj = SplititGroup.objects.create(
+                    name=name, description=description, to_simplify=to_simplify, created_by=created_by_obj)
 
-                    splitit_group_obj.members.add(created_by_obj)
-                    splitit_group_obj.save()
+                splitit_group_obj.members.add(created_by_obj)
+                splitit_group_obj.save()
 
-                else:
-                    response["message"] = "USER CANNOT HAVE TWO GROUPS OF SAME NAME"
-                    esp_status = status.HTTP_409_CONFLICT
+                # if SplititGroup.objects.filter(created_by=created_by_obj, name=name).exists() == False:
+                #     splitit_group_obj = SplititGroup.objects.create(
+                #         name=name, description=description, to_simplify=to_simplify, created_by=created_by_obj)
+
+                #     splitit_group_obj.members.add(created_by_obj)
+                #     splitit_group_obj.save()
+
+                # else:
+                #     response["message"] = "USER CANNOT HAVE TWO GROUPS OF SAME NAME"
+                #     esp_status = status.HTTP_409_CONFLICT
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -191,10 +201,15 @@ class CreateBillAPI(APIView):
             created_by_obj = SplititUser.objects.get(
                 username=request.user.username)
 
+            name = data.get('name')
             group_id = data.get('group_id')
+            splitting_type = data.get('splitting_type')
+            currency = data.get('currency', 'INR')
+
+            member_transactions = data.get('member_transactions')
 
             '''
-            The members payment data according to splitting method is expected
+            The members transaction data according to splitting method is expected
             to be calculated in the frontend and is expected in the following format:
 
             [
@@ -208,9 +223,47 @@ class CreateBillAPI(APIView):
                 },
                 ...
             ]
-
             '''
 
+            total_amount = data.get('total_amount')
+
+            if isNull(group_id) or isNull(splitting_type) or isNull(member_transactions) or isNull(total_amount) or isNull(name):
+                resp_status = status.HTTP_401_UNAUTHORIZED
+
+            else:
+                payer_obj = SplititUser.objects.get(
+                    username=request.user.username)
+                group_obj = SplititGroup.objects.get(pk=group_id)
+
+                if Bill.objects.filter(group=group_obj, name=name).exists() == False:
+                    bill_obj = Bill.objects.create(
+                        payer=payer_obj, name=name, group=group_obj, splitting_type=splitting_type, total_amount=total_amount, currency=currency)
+
+                    response['bill_id'] = str(bill_obj.id)
+
+                    '''
+                    Below is an important logic of the program, for each debter, this logic will
+
+                    1) Add the amount_owed to the debter
+                    2) Add the transaction to the transaction table
+                    3) Add the transaction to group transaction table
+                    '''
+
+                    for member_transaction in member_transactions:
+                        debter_id = member_transactions['user_id']
+                        debter_obj = SplititUser.objects.get(id=debter_id)
+                        amount = float(member_transactions['amount'])
+
+                        debter_obj.amount_owed += amount
+                        debter_obj.save()
+
+                        addToGroupTransactions(amount, debter_obj, bill_obj)
+                        Transaction.objects.create(
+                            bill=bill_obj, amount=amount, debter=debter_obj)
+
+                else:
+                    response["message"] = "GROUP CANNOT HAVE TWO BILLS OF SAME NAME"
+                    esp_status = status.HTTP_409_CONFLICT
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
