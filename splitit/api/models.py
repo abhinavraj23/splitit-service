@@ -13,6 +13,9 @@ class SplititUser(User):
     amount_owed = models.DecimalField(
         max_digits=7, decimal_places=1, default=0, blank=True)
 
+    amount_paid = models.DecimalField(
+        max_digits=7, decimal_places=1, default=0, blank=True)
+
     class Meta:
         verbose_name = "SplititUser"
         verbose_name_plural = "SplititUser"

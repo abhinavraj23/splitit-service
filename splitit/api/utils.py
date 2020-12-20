@@ -1,4 +1,4 @@
-from splitit.api.models import *
+from api.models import *
 
 
 def isNull(obj):

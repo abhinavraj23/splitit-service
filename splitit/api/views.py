@@ -16,8 +16,8 @@ from django.utils import timezone
 
 from datetime import datetime
 
-from splitit.api.models import *
-from splitit.api.utils import *
+from api.models import *
+from api.utils import *
 
 import sys
 import logging
@@ -96,6 +96,7 @@ class CreateGroupAPI(APIView):
 
                 splitit_group_obj.members.add(created_by_obj)
                 splitit_group_obj.save()
+                resp_status = status.HTTP_200_OK
 
                 # if SplititGroup.objects.filter(created_by=created_by_obj, name=name).exists() == False:
                 #     splitit_group_obj = SplititGroup.objects.create(
@@ -233,6 +234,11 @@ class CreateBillAPI(APIView):
             else:
                 payer_obj = SplititUser.objects.get(
                     username=request.user.username)
+
+                total_amount = float(total_amount)
+                payer_obj.amount_paid += total_amount
+                payer_obj.save()
+
                 group_obj = SplititGroup.objects.get(pk=group_id)
 
                 if Bill.objects.filter(group=group_obj, name=name).exists() == False:
@@ -261,6 +267,7 @@ class CreateBillAPI(APIView):
                         Transaction.objects.create(
                             bill=bill_obj, amount=amount, debter=debter_obj)
 
+                    resp_status = status.HTTP_200_OK
                 else:
                     response["message"] = "GROUP CANNOT HAVE TWO BILLS OF SAME NAME"
                     esp_status = status.HTTP_409_CONFLICT
@@ -296,7 +303,7 @@ class UpdateBillAPI(APIView):
 class GetTotalDebtAPI(APIView):
     permission_classes = (IsAuthenticated, )
 
-    def post(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         response = {}
         resp_status = status.HTTP_500_INTERNAL_SERVER_ERROR
         try:
@@ -304,6 +311,12 @@ class GetTotalDebtAPI(APIView):
             logger.info("GetTotalDebtAPI: %s", str(data))
             if not isinstance(data, dict):
                 data = json.loads(data)
+
+            splitit_user_obj = SplititUser.objects.get(
+                username=request.user.username)
+            response['total_amount_owed'] = splitit_user_obj.amount_owed
+            response['total_amount_paid'] = splitit_user_obj.amount_paid
+            resp_status = status.HTTP_200_OK
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
