@@ -95,6 +95,37 @@ class AddMemberToGroupAPI(APIView):
             if not isinstance(data, dict):
                 data = json.loads(data)
 
+            group_id = data.get('group_id')
+            username = data.get('username')
+
+            if group_id is None or username is None:
+                resp_status = status.HTTP_400_BAD_REQUEST
+            else:
+                group_exists = SplititGroup.objects.filter(
+                    pk=group_id).exists()
+                user_exists = SplititUser.objects.filter(
+                    username=username).exists()
+
+                if group_exists and user_exists:
+                    splitit_group_obj = SplititGroup.objects.get(pk=group_id)
+
+                    if request.user.username != splitit_group_obj.created_by.username:
+                        resp_status = status.HTTP_401_UNAUTHORIZED
+                    else:
+                        user_already_member = SplititGroup.objects.filter(
+                            members__username=request.user.username)
+
+                        if user_already_member:
+                            resp_status = status.HTTP_409_CONFLICT
+                        else:
+                            splitit_user_obj = SplititUser.objects.get(
+                                username=username)
+                            splitit_group_obj.members.add(splitit_user_obj)
+                            splitit_group_obj.save()
+                            resp_status = status.HTTP_200_OK
+                else:
+                    resp_status = status.HTTP_400_BAD_REQUEST
+
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             logger.error("AddMemberToGroupAPI: %s at %s",
