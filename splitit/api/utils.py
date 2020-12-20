@@ -1,12 +1,53 @@
-from api.models import *
+from splitit.api.models import *
+import heapq
+from collections import defaultdict
 
 
 def isNull(obj):
     return obj is None
 
 
-def minimumSpaningTree(group_transaction_objs):
-    return "abc"
+def minimize_transaction(group_transaction_objs):
+    # transactions are tubbles with (from, to, amount)
+    # do all transaction which gives the net_flow to and from each friends
+
+    net_flow = defaultdict(float)
+    for group_transaction_obj in group_transaction_objs:
+        net_flow[str(group_transaction_obj.payer.id)
+                 ] -= float(group_transaction_obj.amount)
+        net_flow[str(group_transaction_obj.debtor.id)
+                 ] += float(group_transaction_obj.amount)
+
+    # negatives and positives are min-heaps to be populated
+    negatives = []
+    positives = []
+    for user_id, amount in net_flow.items():
+        if amount < 0:
+            heapq.heappush(negatives, (amount, user_id))
+        elif amount > 0:
+            # python has a min heap per default...
+            heapq.heappush(positives, (-amount, user_id))
+
+    settlement = []
+    # optimize the flow using the two heaps
+    while positives and negatives:
+
+        pos = heapq.heappop(positives)
+        neg = heapq.heappop(negatives)
+        amount = max(pos[0], neg[0])  # are both negative values
+
+        temp = {}
+        temp['payer'] = str(neg[1])
+        temp['debtor'] = str(pos[1])
+        temp['amount'] = str(-amount)
+        settlement.append(temp)
+
+        if pos[0] - amount < 0:
+            heapq.heappush(positives, (pos[0] + amount, pos[1]))
+        elif neg[0] - amount < 0:
+            heapq.heappush(negatives, (neg[0] + amount, neg[1]))
+
+    return settlement
 
 
 def addToGroupTransactions(amount, debtor_obj, bill_obj):

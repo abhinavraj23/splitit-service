@@ -16,8 +16,8 @@ from django.utils import timezone
 
 from datetime import datetime
 
-from api.models import *
-from api.utils import *
+from splitit.api.models import *
+from splitit.api.utils import *
 
 import sys
 import logging
@@ -365,7 +365,6 @@ class GetGroupDebtAPI(APIView):
                 response['group_amount_paid'] = amount_paid
                 resp_status = status.HTTP_200_OK
 
-
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             logger.error("GetGroupDebtAPI: %s at %s",
@@ -392,14 +391,35 @@ class SettleTransactionAPI(APIView):
                 resp_status = status.HTTP_400_BAD_REQUEST
             else:
                 group_obj = SplititGroup.objects.get(id=group_id)
-                group_transaction_objs = GroupTransaction.objects.filter(group=group_obj)
+                group_transaction_objs = GroupTransaction.objects.filter(
+                    group=group_obj)
 
                 if group_obj.to_simplify:
-                    minimumSpaningTree(group_transaction_objs)
+                    response['settlement'] = minimize_transaction(
+                        group_transaction_objs)
 
                 else:
-                    resp_status = status.HTTP_200_OK
+                    '''
+                    The result will of the  following format:
 
+                    [
+                        {
+                            payer: user_id,
+                            debtor: user_id,
+                            amount: 100 (whatever)
+                        }
+                    ]
+                    '''
+                    settlement = []
+                    for group_transaction_obj in group_transaction_objs:
+                        temp = {}
+                        temp['payer'] = str(group_transaction_obj.payer.id)
+                        temp['debtor'] = str(group_transaction_obj.debtor.id)
+                        temp['amount'] = str(group_transaction_obj.amount)
+                        settlement.append(temp)
+
+                    response['settelement'] = settlement
+                resp_status = status.HTTP_200_OK
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
