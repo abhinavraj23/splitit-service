@@ -83,7 +83,7 @@ class CreateGroupAPI(APIView):
         return Response(data=response, status=resp_status)
 
 
-class AddMemberToGroup(APIView):
+class AddMemberToGroupAPI(APIView):
     permission_classes = (IsAuthenticated, )
 
     def post(self, request, *args, **kwargs):
@@ -91,19 +91,19 @@ class AddMemberToGroup(APIView):
         resp_status = status.HTTP_500_INTERNAL_SERVER_ERROR
         try:
             data = request.data
-            logger.info("AddMemberToGroup: %s", str(data))
+            logger.info("AddMemberToGroupAPI: %s", str(data))
             if not isinstance(data, dict):
                 data = json.loads(data)
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
-            logger.error("AddMemberToGroup: %s at %s",
+            logger.error("AddMemberToGroupAPI: %s at %s",
                          e, str(exc_tb.tb_lineno))
 
         return Response(data=response, status=resp_status)
 
 
-class RemoveMemberFromGroup(APIView):
+class RemoveMemberFromGroupAPI(APIView):
     permission_classes = (IsAuthenticated, )
 
     def post(self, request, *args, **kwargs):
@@ -111,13 +111,13 @@ class RemoveMemberFromGroup(APIView):
         resp_status = status.HTTP_500_INTERNAL_SERVER_ERROR
         try:
             data = request.data
-            logger.info("RemoveMemberFromGroup: %s", str(data))
+            logger.info("RemoveMemberFromGroupAPI: %s", str(data))
             if not isinstance(data, dict):
                 data = json.loads(data)
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
-            logger.error("RemoveMemberFromGroup: %s at %s",
+            logger.error("RemoveMemberFromGroupAPI: %s at %s",
                          e, str(exc_tb.tb_lineno))
 
         return Response(data=response, status=resp_status)
@@ -221,3 +221,22 @@ class SettleBalanceAPI(APIView):
                          e, str(exc_tb.tb_lineno))
 
         return Response(data=response, status=resp_status)
+
+
+SignUp = SignUpAPI.as_view()
+
+CreateGroup = CreateGroupAPI.as_view()
+
+AddMemberToGroup = AddMemberToGroupAPI.as_view()
+
+RemoveMemberFromGroup = RemoveMemberFromGroupAPI.as_view()
+
+CreateBill = CreateBillAPI.as_view()
+
+UpdateBill = UpdateBillAPI.as_view()
+
+GetTotalDebt = GetTotalDebtAPI.as_view()
+
+GetGroupDebt = GetGroupDebtAPI.as_view()
+
+SettleBalance = SettleBalanceAPI.as_view()
