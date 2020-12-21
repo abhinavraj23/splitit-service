@@ -49,6 +49,7 @@ class SignUpAPI(APIView):
             amount_owed = 0
 
             if isNull(first_name) or isNull(email) or isNull(password):
+                response['message'] = "BAD REQUEST"
                 resp_status = status.HTTP_400_BAD_REQUEST
             else:
                 if SplititUser.objects.filter(username=email).exists() == False:
@@ -57,8 +58,10 @@ class SignUpAPI(APIView):
                     splitit_user_obj.set_password(password)
                     splitit_user_obj.save()
                     response["username"] = splitit_user_obj.username
+                    response['message'] = "SUCCESS"
                     resp_status = status.HTTP_200_OK
                 else:
+                    response['message'] = "USER WITH EMAIL ALREADY EXISTS"
                     resp_status = status.HTTP_409_CONFLICT
 
         except Exception as e:
@@ -89,6 +92,7 @@ class CreateGroupAPI(APIView):
                 username=request.user.username)
 
             if name is None:
+                response['message'] = "BAD REQUEST"
                 resp_status = status.HTTP_400_BAD_REQUEST
             else:
                 splitit_group_obj = SplititGroup.objects.create(
@@ -96,6 +100,7 @@ class CreateGroupAPI(APIView):
 
                 splitit_group_obj.members.add(created_by_obj)
                 splitit_group_obj.save()
+                response['message'] = "SUCCESS"
                 resp_status = status.HTTP_200_OK
 
                 # if SplititGroup.objects.filter(created_by=created_by_obj, name=name).exists() == False:
@@ -132,6 +137,7 @@ class AddMemberToGroupAPI(APIView):
             username = data.get('username')
 
             if isNull(group_id) or isNull(username):
+                response['message'] = "BAD REQUEST"
                 resp_status = status.HTTP_400_BAD_REQUEST
             else:
                 group_exists = SplititGroup.objects.filter(
@@ -143,20 +149,24 @@ class AddMemberToGroupAPI(APIView):
                     splitit_group_obj = SplititGroup.objects.get(pk=group_id)
 
                     if request.user.username != splitit_group_obj.created_by.username:
+                        response['message'] = "UNAUTHORIZED"
                         resp_status = status.HTTP_401_UNAUTHORIZED
                     else:
                         user_already_member = SplititGroup.objects.filter(
                             members__username=request.user.username).exists()
 
                         if user_already_member:
+                            response['message'] = "USER ALREADY MEMBER"
                             resp_status = status.HTTP_409_CONFLICT
                         else:
                             splitit_user_obj = SplititUser.objects.get(
                                 username=username)
                             splitit_group_obj.members.add(splitit_user_obj)
                             splitit_group_obj.save()
+                            response['message'] = "SUCCESS"
                             resp_status = status.HTTP_200_OK
                 else:
+                    response['message'] = "BAD REQUEST"
                     resp_status = status.HTTP_400_BAD_REQUEST
 
         except Exception as e:
@@ -183,11 +193,13 @@ class RemoveMemberFromGroupAPI(APIView):
             group_id = data.get('group_id')
 
             if isNull(group_id) or isNull(member_username):
+                response['message'] = "BAD REQUEST"
                 resp_status = status.HTTP_400_BAD_REQUEST
             else:
                 group_obj = SplititGroup.objects.get(id=group_id)
 
                 if group_obj.created_by.username != request.user.username:
+                    response['message'] = "UNAUTHORIZED"
                     resp_status = status.HTTP_401_UNAUTHORIZED
                 else:
                     member_obj = SplititUser.objects.get(
@@ -259,6 +271,7 @@ class CreateBillAPI(APIView):
             total_amount = data.get('total_amount')
 
             if isNull(group_id) or isNull(splitting_type) or isNull(member_transactions) or isNull(total_amount) or isNull(name):
+                response['message'] = "BAD REQUEST"
                 resp_status = status.HTTP_400_BAD_REQUEST
 
             else:
@@ -301,6 +314,7 @@ class CreateBillAPI(APIView):
                         Transaction.objects.create(
                             bill=bill_obj, amount=amount, debtor=debtor_obj)
 
+                    response['message'] = "SUCCESS"
                     resp_status = status.HTTP_200_OK
                 else:
                     response["message"] = "GROUP CANNOT HAVE TWO BILLS OF SAME NAME"
@@ -350,6 +364,7 @@ class UpdateBillAPI(APIView):
             bill_obj = Bill.objects.get(id=bill_id)
 
             if bill_obj.payer.username != request.user.username:
+                response['message'] = "UNAUTHORIZED"
                 resp_status = status.HTTP_401_UNAUTHORIZED
             else:
                 name = data.get('name')
@@ -362,6 +377,7 @@ class UpdateBillAPI(APIView):
                 total_amount = data.get('total_amount')
 
                 if isNull(splitting_type) or isNull(member_transactions) or isNull(total_amount) or isNull(name):
+                    response['message'] = "BAD REQUEST"
                     resp_status = status.HTTP_400_BAD_REQUEST
 
                 else:
@@ -413,6 +429,7 @@ class UpdateBillAPI(APIView):
                                 bill=bill_obj, amount=amount, debtor=debtor_obj)
 
                         response['id'] = str(bill_obj.id)
+                        response['message'] = "SUCCESS"
                         resp_status = status.HTTP_200_OK
 
         except Exception as e:
@@ -439,6 +456,7 @@ class GetTotalDebtAPI(APIView):
                 username=request.user.username)
             response['total_amount_owed'] = splitit_user_obj.amount_owed
             response['total_amount_paid'] = splitit_user_obj.amount_paid
+            response['message'] = "SUCCESS"
             resp_status = status.HTTP_200_OK
 
         except Exception as e:
@@ -464,6 +482,7 @@ class GetGroupDebtAPI(APIView):
             group_id = data.get('group_id')
 
             if isNull(group_id):
+                response['message'] = "BAD REQUEST"
                 resp_status = status.HTTP_400_BAD_REQUEST
 
             else:
@@ -486,6 +505,7 @@ class GetGroupDebtAPI(APIView):
 
                 response['group_amount_owed'] = amount_owed
                 response['group_amount_paid'] = amount_paid
+                response['message'] = "SUCCESS"
                 resp_status = status.HTTP_200_OK
 
         except Exception as e:
@@ -511,6 +531,7 @@ class SettleTransactionAPI(APIView):
             group_id = data.get('group_id')
 
             if isNull(group_id):
+                response['message'] = "BAD REQUEST"
                 resp_status = status.HTTP_400_BAD_REQUEST
             else:
                 group_obj = SplititGroup.objects.get(id=group_id)
@@ -542,6 +563,8 @@ class SettleTransactionAPI(APIView):
                         settlement.append(temp)
 
                     response['settelement'] = settlement
+
+                response['message'] = "SUCCESS"
                 resp_status = status.HTTP_200_OK
 
         except Exception as e:
