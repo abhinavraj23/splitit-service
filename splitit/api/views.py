@@ -238,24 +238,38 @@ class RemoveMemberFromGroupAPI(APIView):
                     response['message'] = "UNAUTHORIZED"
                     resp_status = status.HTTP_401_UNAUTHORIZED
                 else:
-                    member_obj = SplititUser.objects.get(
-                        username=member_username)
-                    group_obj.members.remove(member_obj)
-                    group_obj.save()
 
-                    '''
-                    Delete all transactions of member in GroupTransaction
-                    as well as Transaction table
-                    '''
+                    member_exists = SplititGroup.objects.filter(
+                        id=group_id, members__username=member_username
+                    )
 
-                    GroupTransaction.objects.filter(
-                        Q(payer=member_obj) | Q(debtor=member_obj), group=group_obj).delete()
+                    if member_exists:
+                        member_obj = SplititUser.objects.get(
+                            username=member_username)
+                        group_obj.members.remove(member_obj)
+                        group_obj.save()
 
-                    Transaction.objects.filter(
-                        debtor=member_obj, bill__group=group_obj).delete()
+                        '''
+                        Delete all transactions of member in GroupTransaction
+                        as well as Transaction table
+                        '''
+                        bill_objs = Bill.objects.filter(payer=member_obj)
 
-                    response['message'] = "SUCCESS"
-                    resp_status = status.HTTP_200_OK
+                        for bill_obj in bill_objs:
+                            Transaction.objects.filter(bill=bill_obj).delete()
+
+                        GroupTransaction.objects.filter(
+                            Q(payer=member_obj) | Q(debtor=member_obj), group=group_obj).delete()
+
+                        Transaction.objects.filter(
+                            debtor=member_obj, bill__group=group_obj).delete()
+
+                        response['message'] = "SUCCESS"
+                        resp_status = status.HTTP_200_OK
+
+                    else:
+                        response['message'] = "MEMBER NOT PRESENT IN GROUP"
+                        resp_status = status.HTTP_409_CONFLICT
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -455,67 +469,61 @@ class UpdateBillAPI(APIView):
                     resp_status = status.HTTP_400_BAD_REQUEST
 
                 else:
-
                     group_obj = bill_obj.group
 
-                    if Bill.objects.filter(group=group_obj, name=name).exists() == True:
-                        response["message"] = "GROUP CANNOT HAVE TWO BILLS OF SAME NAME"
-                        resp_status = status.HTTP_409_CONFLICT
+                    previous_transaction_objs = Transaction.objects.filter(
+                        bill=bill_obj)
+                    payer_obj = bill_obj.payer
 
-                    else:
-                        # Delete the transaction of the previous bill
-                        previous_transaction_objs = Transaction.objects.filter(
-                            bill=bill_obj)
-                        payer_obj = bill_obj.payer
+                    # Delete the previous transactions
+                    for transaction_obj in previous_transaction_objs:
+                        debtor_obj = transaction_obj.debtor
 
-                        for transaction_obj in previous_transaction_objs:
-                            debtor_obj = transaction_obj.debtor
+                        amount = float(transaction_obj.amount)
+                        debtor_amount_owed = float(debtor_obj.amount_owed)
+                        debtor_amount_owed -= amount
+                        debtor_obj.amount_owed = debtor_amount_owed
+                        debtor_obj.save()
 
-                            amount = float(transaction_obj.amount)
-                            debtor_amount_owed = float(debtor_obj.amount_owed)
-                            debtor_amount_owed -= amount
-                            debtor_obj.amount_owed = debtor_amount_owed
-                            debtor_obj.save()
+                        addToGroupTransactions(
+                            amount, debtor_obj, payer_obj, group_obj)
+                        transaction_obj.delete()
 
-                            addToGroupTransactions(
-                                amount, debtor_obj, payer_obj, group_obj)
-                            transaction_obj.delete()
+                    total_amount = float(total_amount)
 
-                        total_amount = float(total_amount)
+                    previous_amount = float(bill_obj.total_amount)
 
-                        previous_amount = float(bill_obj.total_amount)
+                    payer_amount_paid = float(payer_obj.amount_paid)
+                    payer_amount_paid += total_amount - previous_amount
+                    payer_obj.amount_paid = payer_amount_paid
+                    payer_obj.save()
 
-                        payer_amount_paid = float(payer_obj.amount_paid)
-                        payer_amount_paid += total_amount - previous_amount
-                        payer_obj.amount_paid = payer_amount_paid
-                        payer_obj.save()
+                    bill_obj.name = name
+                    bill_obj.splitting_type = splitting_type
+                    bill_obj.currency = currency
+                    bill_obj.total_amount = total_amount
+                    bill_obj.save()
 
-                        bill_obj.name = name
-                        bill_obj.splitting_type = splitting_type
-                        bill_obj.currency = currency
-                        bill_obj.total_amount = total_amount
-                        bill_obj.save()
+                    # Now update the Transaction and Group transaction table
+                    for member_transaction in member_transactions:
+                        debtor_username = member_transaction['username']
+                        debtor_obj = SplititUser.objects.get(
+                            username=debtor_username)
+                        amount = float(member_transaction['amount'])
 
-                        # Now update the Transaction and Group transaction table
-                        for member_transaction in member_transactions:
-                            debtor_username = member_transaction['username']
-                            debtor_obj = SplititUser.objects.get(
-                                username=debtor_username)
-                            amount = float(member_transaction['amount'])
+                        debtor_amount_owed = float(debtor_obj.amount_owed)
+                        debtor_amount_owed += amount
+                        debtor_obj.amount_owed = debtor_amount_owed
+                        debtor_obj.save()
 
-                            debtor_amount_owed = float(debtor_obj.amount_owed)
-                            debtor_amount_owed += amount
-                            debtor_obj.amount_owed += debtor_amount_owed
-                            debtor_obj.save()
+                        addToGroupTransactions(
+                            amount, payer_obj, debtor_obj, group_obj)
+                        Transaction.objects.create(
+                            bill=bill_obj, amount=amount, debtor=debtor_obj)
 
-                            addToGroupTransactions(
-                                amount, payer_obj, debtor_obj, group_obj)
-                            Transaction.objects.create(
-                                bill=bill_obj, amount=amount, debtor=debtor_obj)
-
-                        response['id'] = str(bill_obj.id)
-                        response['message'] = "SUCCESS"
-                        resp_status = status.HTTP_200_OK
+                    response['id'] = str(bill_obj.id)
+                    response['message'] = "SUCCESS"
+                    resp_status = status.HTTP_200_OK
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -555,7 +563,7 @@ class GetTotalDebtAPI(APIView):
 class GetGroupDebtAPI(APIView):
     permission_classes = (IsAuthenticated, )
 
-    def post(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         response = {}
         resp_status = status.HTTP_500_INTERNAL_SERVER_ERROR
         try:
