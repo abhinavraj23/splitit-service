@@ -13,9 +13,9 @@ def minimize_transaction(group_transaction_objs):
 
     net_flow = defaultdict(float)
     for group_transaction_obj in group_transaction_objs:
-        net_flow[str(group_transaction_obj.payer.id)
+        net_flow[str(group_transaction_obj.payer.username)
                  ] -= float(group_transaction_obj.amount)
-        net_flow[str(group_transaction_obj.debtor.id)
+        net_flow[str(group_transaction_obj.debtor.username)
                  ] += float(group_transaction_obj.amount)
 
     # negatives and positives are min-heaps to be populated
@@ -69,7 +69,10 @@ def addToGroupTransactions(amount, payer_obj, debtor_obj, group_obj):
         transaction_obj = GroupTransaction.objects.get(
             group=group_obj, payer=payer_obj, debtor=debtor_obj)
 
-        transaction_obj.amount += amount
+
+        transaction_amount = float(transaction_obj.amount)
+        transaction_amount += amount
+        transaction_obj.amount = transaction_amount
         transaction_obj.save()
 
     else:
@@ -81,13 +84,15 @@ def addToGroupTransactions(amount, payer_obj, debtor_obj, group_obj):
             transaction_obj = GroupTransaction.objects.get(
                 group=group_obj, payer=debtor_obj, debtor=payer_obj)
 
-            previous_transaction_amount = transaction_obj.amount
+            previous_transaction_amount = float(transaction_obj.amount)
 
             if previous_transaction_amount == amount:
                 transaction_obj.delete()
 
             elif previous_transaction_amount > amount:
-                transaction_obj.amount = previous_transaction_amount - amount
+                transaction_amount = float(transaction_obj.amount)
+                transaction_amount = previous_transaction_amount - amount
+                transaction_obj.amount = transaction_amount
                 transaction_obj.save()
 
             else:

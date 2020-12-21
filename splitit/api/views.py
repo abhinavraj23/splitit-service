@@ -119,6 +119,7 @@ class CreateGroupAPI(APIView):
 
                 splitit_group_obj.members.add(created_by_obj)
                 splitit_group_obj.save()
+                response['id'] = splitit_group_obj.id
                 response['message'] = "SUCCESS"
                 resp_status = status.HTTP_200_OK
 
@@ -152,7 +153,6 @@ class AddMemberToGroupAPI(APIView):
             if not isinstance(data, dict):
                 data = json.loads(data)
 
-
             '''
             Payload
             {
@@ -181,7 +181,7 @@ class AddMemberToGroupAPI(APIView):
                         resp_status = status.HTTP_401_UNAUTHORIZED
                     else:
                         user_already_member = SplititGroup.objects.filter(
-                            members__username=request.user.username).exists()
+                            members__username=member_username, id=group_id).exists()
 
                         if user_already_member:
                             response['message'] = "USER ALREADY MEMBER"
@@ -277,14 +277,12 @@ class CreateBillAPI(APIView):
             if not isinstance(data, dict):
                 data = json.loads(data)
 
-            created_by_obj = SplititUser.objects.get(
-                username=request.user.username)
-
             '''
             Payload
             {
-                name: ""
+                name: "",
                 group_id: "",
+                payer_username: "",
                 splitting_type: "",
                 currency: "", (optional)
                 member_transactions: "", (format described in next comment)
@@ -294,6 +292,7 @@ class CreateBillAPI(APIView):
 
             name = data.get('name')
             group_id = data.get('group_id')
+            payer_username = data.get('payer_username')
             splitting_type = data.get('splitting_type')
             currency = data.get('currency', 'INR')
 
@@ -305,11 +304,11 @@ class CreateBillAPI(APIView):
 
             [
                 {
-                    user_id: "a1",
+                    username: "a1",
                     amount: "90"
                 },
                 {
-                    user_id: "a2",
+                    username: "a2",
                     amount: "100"
                 },
                 ...
@@ -318,55 +317,70 @@ class CreateBillAPI(APIView):
 
             total_amount = data.get('total_amount')
 
-            if isNull(group_id) or isNull(splitting_type) or isNull(member_transactions) or isNull(total_amount) or isNull(name):
+            if isNull(group_id) or isNull(splitting_type) or isNull(payer_username) or isNull(member_transactions) or isNull(total_amount) or isNull(name):
                 response['message'] = "BAD REQUEST"
                 resp_status = status.HTTP_400_BAD_REQUEST
 
             else:
-                payer_obj = SplititUser.objects.get(
-                    username=request.user.username)
 
-                total_amount = float(total_amount)
-                payer_obj.amount_paid += total_amount
-                payer_obj.save()
+                is_payer_member = SplititGroup.objects.filter(
+                    members__username=payer_username, id=group_id).exists()
 
-                group_obj = SplititGroup.objects.get(pk=group_id)
+                if is_payer_member:
+                    payer_obj = SplititUser.objects.get(
+                        username=payer_username)
 
-                if Bill.objects.filter(group=group_obj, name=name).exists() == False:
-                    bill_obj = Bill.objects.create(
-                        payer=payer_obj, name=name, group=group_obj, splitting_type=splitting_type, total_amount=total_amount, currency=currency)
+                    total_amount = float(total_amount)
+                    payer_amount_paid = float(payer_obj.amount_paid)
+                    payer_amount_paid += total_amount
+                    payer_obj.amount_paid = payer_amount_paid
+                    payer_obj.save()
 
-                    response['bill_id'] = str(bill_obj.id)
+                    group_obj = SplititGroup.objects.get(pk=group_id)
 
-                    '''
-                    Below is an important logic of the program, for each debtor, this logic will
+                    if Bill.objects.filter(group=group_obj, name=name).exists() == False:
+                        bill_obj = Bill.objects.create(
+                            payer=payer_obj, name=name, group=group_obj, splitting_type=splitting_type, total_amount=total_amount, currency=currency)
 
-                    1) Add the amount_owed to the debtor
-                    2) Add the transaction to the transaction table
-                    3) Add the transaction to group transaction table
-                    '''
+                        response['bill_id'] = str(bill_obj.id)
 
-                    for member_transaction in member_transactions:
-                        debtor_id = member_transactions['user_id']
-                        debtor_obj = SplititUser.objects.get(id=debtor_id)
-                        amount = float(member_transactions['amount'])
+                        '''
+                        Below is an important logic of the program, for each debtor, this logic will
 
-                        debtor_obj.amount_owed += amount
-                        debtor_obj.save()
+                        1) Add the amount_owed to the debtor
+                        2) Add the transaction to the transaction table
+                        3) Add the transaction to group transaction table
+                        '''
 
-                        payer_obj = bill_obj.payer
-                        group_obj = bill_obj.group
+                        for member_transaction in member_transactions:
+                            debtor_username = member_transaction['username']
+                            debtor_obj = SplititUser.objects.get(
+                                username=debtor_username)
 
-                        addToGroupTransactions(
-                            amount, payer_obj, debtor_obj, group_obj)
-                        Transaction.objects.create(
-                            bill=bill_obj, amount=amount, debtor=debtor_obj)
+                            amount = float(member_transaction['amount'])
+                            debtor_amount_owed = float(debtor_obj.amount_owed)
+                            debtor_amount_owed += amount
+                            debtor_obj.amount_owed = debtor_amount_owed
 
-                    response['message'] = "SUCCESS"
-                    resp_status = status.HTTP_200_OK
+                            debtor_obj.save()
+
+                            payer_obj = bill_obj.payer
+                            group_obj = bill_obj.group
+
+                            addToGroupTransactions(
+                                amount, payer_obj, debtor_obj, group_obj)
+                            Transaction.objects.create(
+                                bill=bill_obj, amount=amount, debtor=debtor_obj)
+
+                        response['message'] = "SUCCESS"
+                        resp_status = status.HTTP_200_OK
+                    else:
+                        response["message"] = "GROUP CANNOT HAVE TWO BILLS OF SAME NAME"
+                        resp_status = status.HTTP_409_CONFLICT
+
                 else:
-                    response["message"] = "GROUP CANNOT HAVE TWO BILLS OF SAME NAME"
-                    resp_status = status.HTTP_409_CONFLICT
+                    response['message'] = "PAYER IS NOT THE GROUP MEMBER"
+                    resp_status = status.HTTP_401_UNAUTHORIZED
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -407,11 +421,11 @@ class UpdateBillAPI(APIView):
 
             [
                 {
-                    user_id: "a1",
+                    username: "a1",
                     amount: "90"
                 },
                 {
-                    user_id: "a2",
+                    username: "a2",
                     amount: "100"
                 },
                 ...
@@ -456,16 +470,24 @@ class UpdateBillAPI(APIView):
 
                         for transaction_obj in previous_transaction_objs:
                             debtor_obj = transaction_obj.debtor
-                            amount = transaction_obj.amount
-                            debtor_obj.amount_owed -= amount
+
+                            amount = float(transaction_obj.amount)
+                            debtor_amount_owed = float(debtor_obj.amount_owed)
+                            debtor_amount_owed -= amount
+                            debtor_obj.amount_owed = debtor_amount_owed
                             debtor_obj.save()
+
                             addToGroupTransactions(
                                 amount, debtor_obj, payer_obj, group_obj)
                             transaction_obj.delete()
 
-                        previous_amount = bill_obj.total_amount
+                        total_amount = float(total_amount)
 
-                        payer_obj.amount_paid += total_amount - previous_amount
+                        previous_amount = float(bill_obj.total_amount)
+
+                        payer_amount_paid = float(payer_obj.amount_paid)
+                        payer_amount_paid += total_amount - previous_amount
+                        payer_obj.amount_paid = payer_amount_paid
                         payer_obj.save()
 
                         bill_obj.name = name
@@ -476,11 +498,14 @@ class UpdateBillAPI(APIView):
 
                         # Now update the Transaction and Group transaction table
                         for member_transaction in member_transactions:
-                            debtor_id = member_transactions['user_id']
-                            debtor_obj = SplititUser.objects.get(id=debtor_id)
-                            amount = float(member_transactions['amount'])
+                            debtor_username = member_transaction['username']
+                            debtor_obj = SplititUser.objects.get(
+                                username=debtor_username)
+                            amount = float(member_transaction['amount'])
 
-                            debtor_obj.amount_owed += amount
+                            debtor_amount_owed = float(debtor_obj.amount_owed)
+                            debtor_amount_owed += amount
+                            debtor_obj.amount_owed += debtor_amount_owed
                             debtor_obj.save()
 
                             addToGroupTransactions(
@@ -622,8 +647,8 @@ class SettleTransactionAPI(APIView):
 
                     [
                         {
-                            payer: user_id,
-                            debtor: user_id,
+                            payer: username,
+                            debtor: username,
                             amount: 100 (whatever)
                         }
                     ]
@@ -631,8 +656,10 @@ class SettleTransactionAPI(APIView):
                     settlement = []
                     for group_transaction_obj in group_transaction_objs:
                         temp = {}
-                        temp['payer'] = str(group_transaction_obj.payer.id)
-                        temp['debtor'] = str(group_transaction_obj.debtor.id)
+                        temp['payer'] = str(
+                            group_transaction_obj.payer.username)
+                        temp['debtor'] = str(
+                            group_transaction_obj.debtor.username)
                         temp['amount'] = str(group_transaction_obj.amount)
                         settlement.append(temp)
 

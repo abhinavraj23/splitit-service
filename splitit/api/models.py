@@ -37,8 +37,8 @@ class SplititGroup(models.Model):
         SplititUser, related_name="created_by", null=True, blank=True, on_delete=models.SET_NULL)
     members = models.ManyToManyField(SplititUser, blank=True)
     to_simplify = models.BooleanField(blank=True, default=False)
-    created_date = models.DateTimeField()
-    modified_date = models.DateTimeField()
+    created_date = models.DateTimeField(null=True, blank=True)
+    modified_date = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = "SplititGroup"
@@ -46,14 +46,12 @@ class SplititGroup(models.Model):
 
     def save(self, *args, **kwargs):
 
-        if self.pk == None:
+        if self.id == None or self.id == "":
             self.created_date = timezone.now()
             self.modified_date = timezone.now()
+            self.id = str(uuid.uuid4())
         else:
             self.modified_date = timezone.now()
-
-        if self.id == None or self.id == "":
-            self.id = str(uuid.uuid4())
 
         super(SplititGroup, self).save(*args, **kwargs)
 
@@ -76,8 +74,8 @@ class Bill(models.Model):
     total_amount = models.DecimalField(
         max_digits=7, decimal_places=1, default=0, blank=True)
     currency = models.CharField(max_length=100, blank=True, default="INR")
-    created_date = models.DateTimeField()
-    modified_date = models.DateTimeField()
+    created_date = models.DateTimeField(null=True, blank=True)
+    modified_date = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Bill"
@@ -85,14 +83,12 @@ class Bill(models.Model):
 
     def save(self, *args, **kwargs):
 
-        if self.pk == None:
+        if self.id == None or self.id == "":
             self.created_date = timezone.now()
             self.modified_date = timezone.now()
+            self.id = str(uuid.uuid4())
         else:
             self.modified_date = timezone.now()
-
-        if self.id == None or self.id == "":
-            self.id = str(uuid.uuid4())
 
         super(Bill, self).save(*args, **kwargs)
 
@@ -106,8 +102,8 @@ class Transaction(models.Model):
         max_digits=7, decimal_places=1, default=0, blank=True)
 
     class Meta:
-        verbose_name = "Bill"
-        verbose_name_plural = "Bill"
+        verbose_name = "Transaction"
+        verbose_name_plural = "Transaction"
 
     def get_payer(self):
         return str(self.bill.payer.username)
