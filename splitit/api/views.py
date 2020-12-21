@@ -263,14 +263,18 @@ class CreateBillAPI(APIView):
                         debtor_obj.amount_owed += amount
                         debtor_obj.save()
 
-                        addToGroupTransactions(amount, debtor_obj, bill_obj)
+                        payer_obj = bill_obj.payer
+                        group_obj = bill_obj.group
+
+                        addToGroupTransactions(
+                            amount, payer_obj, debtor_obj, group_obj)
                         Transaction.objects.create(
                             bill=bill_obj, amount=amount, debtor=debtor_obj)
 
                     resp_status = status.HTTP_200_OK
                 else:
                     response["message"] = "GROUP CANNOT HAVE TWO BILLS OF SAME NAME"
-                    esp_status = status.HTTP_409_CONFLICT
+                    resp_status = status.HTTP_409_CONFLICT
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -291,6 +295,95 @@ class UpdateBillAPI(APIView):
             logger.info("UpdateBillAPI: %s", str(data))
             if not isinstance(data, dict):
                 data = json.loads(data)
+
+            '''
+            This API assumes that payer cannot change, group cannot be changed,
+            name of the bill can be changed, currency can be changed, total amount can be changed,
+            and the member transactions have to passed again in the same format i.e.
+
+            [
+                {
+                    user_id: "a1",
+                    amount: "90"
+                },
+                {
+                    user_id: "a2",
+                    amount: "100"
+                },
+                ...
+            ]
+
+            Also only the payer can update the bill
+            '''
+
+            bill_id = data.get("bill_id")
+            bill_obj = Bill.objects.get(id=bill_id)
+
+            if bill_obj.payer.username != request.user.username:
+                resp_status = status.HTTP_401_UNAUTHORIZED
+            else:
+                name = data.get('name')
+
+                splitting_type = data.get('splitting_type')
+                currency = data.get('currency', 'INR')
+
+                member_transactions = data.get('member_transactions')
+
+                total_amount = data.get('total_amount')
+
+                if isNull(splitting_type) or isNull(member_transactions) or isNull(total_amount) or isNull(name):
+                    resp_status = status.HTTP_400_BAD_REQUEST
+
+                else:
+
+                    group_obj = bill_obj.group
+
+                    if Bill.objects.filter(group=group_obj, name=name).exists() == True:
+                        response["message"] = "GROUP CANNOT HAVE TWO BILLS OF SAME NAME"
+                        resp_status = status.HTTP_409_CONFLICT
+
+                    else:
+                        # Delete the transaction of the previous bill
+                        previous_transaction_objs = Transaction.objects.filter(
+                            bill=bill_obj)
+                        payer_obj = bill_obj.payer
+
+                        for transaction_obj in previous_transaction_objs:
+                            debtor_obj = transaction_obj.debtor
+                            amount = transaction_obj.amount
+                            debtor_obj.amount_owed -= amount
+                            debtor_obj.save()
+                            addToGroupTransactions(
+                                amount, debtor_obj, payer_obj, group_obj)
+                            transaction_obj.delete()
+
+                        previous_amount = bill_obj.total_amount
+
+                        payer_obj.amount_paid += total_amount - previous_amount
+                        payer_obj.save()
+
+                        bill_obj.name = name
+                        bill_obj.splitting_type = splitting_type
+                        bill_obj.currency = currency
+                        bill_obj.total_amount = total_amount
+                        bill_obj.save()
+
+                        # Now update the Transaction and Group transaction table
+                        for member_transaction in member_transactions:
+                            debtor_id = member_transactions['user_id']
+                            debtor_obj = SplititUser.objects.get(id=debtor_id)
+                            amount = float(member_transactions['amount'])
+
+                            debtor_obj.amount_owed += amount
+                            debtor_obj.save()
+
+                            addToGroupTransactions(
+                                amount, payer_obj, debtor_obj, group_obj)
+                            Transaction.objects.create(
+                                bill=bill_obj, amount=amount, debtor=debtor_obj)
+
+                        response['id'] = str(bill_obj.id)
+                        resp_status = status.HTTP_200_OK
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()

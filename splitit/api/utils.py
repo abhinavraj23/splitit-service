@@ -50,10 +50,7 @@ def minimize_transaction(group_transaction_objs):
     return settlement
 
 
-def addToGroupTransactions(amount, debtor_obj, bill_obj):
-    payer_obj = bill_obj.payer
-    group_obj = bill_obj.group
-
+def addToGroupTransactions(amount, payer_obj, debtor_obj, group_obj):
     '''
     let payer = A, debtor = B
     Here we are checking if in the group any of the following scenarios are present:
