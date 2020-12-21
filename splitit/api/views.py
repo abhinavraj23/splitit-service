@@ -179,6 +179,36 @@ class RemoveMemberFromGroupAPI(APIView):
             if not isinstance(data, dict):
                 data = json.loads(data)
 
+            member_username = data.get('member_username')
+            group_id = data.get('group_id')
+
+            if isNull(group_id) or isNull(member_username):
+                resp_status = status.HTTP_400_BAD_REQUEST
+            else:
+                group_obj = SplititGroup.objects.get(id=group_id)
+
+                if group_obj.created_by.username != request.user.username:
+                    resp_status = status.HTTP_401_UNAUTHORIZED
+                else:
+                    member_obj = SplititUser.objects.get(
+                        username=member_username)
+                    group_obj.members.remove(member_obj)
+                    group_obj.save()
+
+                    '''
+                    Delete all transactions of member in GroupTransaction
+                    as well as Transaction table
+                    '''
+
+                    GroupTransaction.objects.filter(
+                        Q(payer=member_obj) | Q(debtor=member_obj), group=group_obj).delete()
+
+                    Transaction.objects.filter(
+                        debtor=member_obj, bill__group=group_obj).delete()
+
+                    response['message'] = "SUCCESS"
+                    resp_status = status.HTTP_200_OK
+
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
             logger.error("RemoveMemberFromGroupAPI: %s at %s",
