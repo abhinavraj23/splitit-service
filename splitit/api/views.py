@@ -42,6 +42,16 @@ class SignUpAPI(APIView):
             if not isinstance(data, dict):
                 data = json.loads(data)
 
+            '''
+            Payload
+            {
+                first_name: "",
+                last_name: "", (optional)
+                email: "",
+                password: ""
+            }
+            '''
+
             first_name = data.get("first_name")
             last_name = data.get("last_name", '')
             email = data.get("email")
@@ -82,6 +92,15 @@ class CreateGroupAPI(APIView):
             logger.info("CreateGroupAPI: %s", str(data))
             if not isinstance(data, dict):
                 data = json.loads(data)
+
+            '''
+            Payload
+            {
+                name: "",
+                description: "", (optional)
+                to_simplify: "", (optional)
+            }
+            '''
 
             name = data.get("name")
             description = data.get("description", "")
@@ -133,17 +152,26 @@ class AddMemberToGroupAPI(APIView):
             if not isinstance(data, dict):
                 data = json.loads(data)
 
-            group_id = data.get('group_id')
-            username = data.get('username')
 
-            if isNull(group_id) or isNull(username):
+            '''
+            Payload
+            {
+                group_id: "",
+                member_username: "",
+            }
+            '''
+
+            group_id = data.get('group_id')
+            member_username = data.get('member_username')
+
+            if isNull(group_id) or isNull(member_username):
                 response['message'] = "BAD REQUEST"
                 resp_status = status.HTTP_400_BAD_REQUEST
             else:
                 group_exists = SplititGroup.objects.filter(
                     pk=group_id).exists()
                 user_exists = SplititUser.objects.filter(
-                    username=username).exists()
+                    username=member_username).exists()
 
                 if group_exists and user_exists:
                     splitit_group_obj = SplititGroup.objects.get(pk=group_id)
@@ -160,7 +188,7 @@ class AddMemberToGroupAPI(APIView):
                             resp_status = status.HTTP_409_CONFLICT
                         else:
                             splitit_user_obj = SplititUser.objects.get(
-                                username=username)
+                                username=member_username)
                             splitit_group_obj.members.add(splitit_user_obj)
                             splitit_group_obj.save()
                             response['message'] = "SUCCESS"
@@ -189,8 +217,16 @@ class RemoveMemberFromGroupAPI(APIView):
             if not isinstance(data, dict):
                 data = json.loads(data)
 
-            member_username = data.get('member_username')
+            '''
+            Payload
+            {
+                group_id: "",
+                member_username: "",
+            }
+            '''
+
             group_id = data.get('group_id')
+            member_username = data.get('member_username')
 
             if isNull(group_id) or isNull(member_username):
                 response['message'] = "BAD REQUEST"
@@ -243,6 +279,18 @@ class CreateBillAPI(APIView):
 
             created_by_obj = SplititUser.objects.get(
                 username=request.user.username)
+
+            '''
+            Payload
+            {
+                name: ""
+                group_id: "",
+                splitting_type: "",
+                currency: "", (optional)
+                member_transactions: "", (format described in next comment)
+                total_amount: ""
+            }
+            '''
 
             name = data.get('name')
             group_id = data.get('group_id')
@@ -339,6 +387,18 @@ class UpdateBillAPI(APIView):
             logger.info("UpdateBillAPI: %s", str(data))
             if not isinstance(data, dict):
                 data = json.loads(data)
+
+            '''
+            Payload
+            {
+                bill_id: "",
+                name: "",
+                splitting_type: "",
+                currency: "", (optional)
+                member_transactions: "", (format described in next comment)
+                total_amount: ""
+            }
+            '''
 
             '''
             This API assumes that payer cannot change, group cannot be changed,
@@ -479,6 +539,13 @@ class GetGroupDebtAPI(APIView):
             if not isinstance(data, dict):
                 data = json.loads(data)
 
+            '''
+            Payload
+            {
+                group_id: ""
+            }
+            '''
+
             group_id = data.get('group_id')
 
             if isNull(group_id):
@@ -527,6 +594,13 @@ class SettleTransactionAPI(APIView):
             logger.info("SettleTransactionAPI: %s", str(data))
             if not isinstance(data, dict):
                 data = json.loads(data)
+
+            '''
+            Payload
+            {
+                group_id: "",
+            }
+            '''
 
             group_id = data.get('group_id')
 
