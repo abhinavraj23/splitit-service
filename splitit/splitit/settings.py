@@ -84,7 +84,7 @@ DATABASES = {
         'NAME': 'splitit_db',
         'USER': 'postgres',
         'PASSWORD': 'postgres',
-        'HOST': 'localhost',
+        'HOST': 'db',
         'PORT': '5432',
     }
 }
